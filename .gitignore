@@ -2,3 +2,13 @@
 *.tachy
 *.pt
 *.weights
+*.tachy
+*.tachyrt
+*.bin
+*.pt
+*.weights
+
+# Keep your code and config files
+!*.py
+!*.yaml
+!*.json
