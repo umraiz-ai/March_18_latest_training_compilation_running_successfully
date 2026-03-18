@@ -1,0 +1,153 @@
+#! /usr/bin/env python
+
+import os
+import time, datetime
+
+
+#######################################################
+################### User Settings #####################
+#######################################################
+PRE_PARAM_DIR = "runs/train/training2/weights"
+# OPT_PARAM_DIR = "runs/train/bsnet-t-o/weights"
+OPT_PARAM_DIR = "runs/train/training3/weights"
+
+ONNX_INPUT_SHAPE = "1 3 416 416"    # (B,C,H,W)
+TACHY_INPUT_SHAPE = "1 416 416 3"   # (B,H,W,C)
+#######################################################
+
+#######################################################
+TRAIN_FILE_TYPE = "pt_yolov9"
+ONNX_FILE_TYPE = "pt2onnx"
+
+SRC_PRE_PATH = os.path.join(PRE_PARAM_DIR, "best.pt")
+SRC_OPT_PATH = os.path.join(OPT_PARAM_DIR, "best.pt")
+
+WORK_DIR = datetime.datetime.now().strftime("20%y%m%d_%H%M%S")
+TEMP_DIR = os.path.join(WORK_DIR, "temp")
+DST_EVAL_PATH = os.path.join(WORK_DIR, "eval.pt")
+DST_COMP_PATH = os.path.join(WORK_DIR, "comp.pt")
+DST_TEMP_PATH = ""
+
+ONNX_EVAL_PATH = os.path.join(WORK_DIR, "eval.onnx")
+ONNX_COMP_PATH = os.path.join(WORK_DIR, "comp.onnx")
+#######################################################
+
+#######################################################
+LAYER_EVAL_PATH = os.path.join(WORK_DIR, "eval.tachy")
+LAYER_COMP_PATH = os.path.join(WORK_DIR, "comp.tachy")
+L_DEFAULT_PAD_MODE="--default_pad_mode=dynamic"
+
+BLOCK_EVAL_PATH = os.path.join(WORK_DIR, "eval_block.tachy")
+BLOCK_COMP_PATH = os.path.join(WORK_DIR, "comp_block.tachy")
+B_DEFAULT_PAD_MODE="--default_pad_mode=dynamic"
+
+DEFAULT_PAD_ORDER="--default_pad_order=up_left"
+STRATEGY_GAP="--strategy_gap=serial"
+LOGIT_ORDER="--logit_order 5 3 0 4 2 1"
+#######################################################
+
+_VERBOSE = False
+
+
+if __name__ == "__main__":
+    cmd = "rm -fv param.bin"
+    os.system(cmd)
+
+    if not os.path.isdir(WORK_DIR): 
+        os.mkdir(WORK_DIR)
+        os.mkdir(TEMP_DIR)
+    else:
+        time.sleep(1)
+        WORK_DIR = datetime.datetime.now().strftime("20%y%m%d_%H%M%S")
+        TEMP_DIR = os.path.join(WORK_DIR, "temp")
+        os.mkdir(WORK_DIR)
+        os.mkdir(TEMP_DIR)
+    print(f"[INFO]: {WORK_DIR} is created.")
+
+    # Deploy
+    cmd = "python TACHY-Compiler/platform_converter/utils/yolov9/deploy_{}.py {} {} {} {} {}".format(
+        TRAIN_FILE_TYPE, 
+        SRC_PRE_PATH, 
+        SRC_OPT_PATH, 
+        DST_EVAL_PATH, 
+        DST_COMP_PATH, 
+        DST_TEMP_PATH
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)
+
+    # Convert
+    cmd = "python TACHY-Compiler/platform_converter/utils/yolov9/convert_{}.py {} {} {}".format(
+        ONNX_FILE_TYPE, 
+        DST_EVAL_PATH, 
+        ONNX_EVAL_PATH, 
+        ONNX_INPUT_SHAPE,
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)
+
+    cmd = "python TACHY-Compiler/platform_converter/utils/yolov9/convert_{}.py {} {} {}".format(
+        ONNX_FILE_TYPE, 
+        DST_COMP_PATH, 
+        ONNX_COMP_PATH, 
+        ONNX_INPUT_SHAPE,
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)
+
+    # Compile - Layer
+    cmd = "python TACHY-Compiler/compiler/utils/tachy_model.py {} {} {} {} {}".format(
+	    ONNX_EVAL_PATH,
+	    LAYER_EVAL_PATH,
+	    TACHY_INPUT_SHAPE,
+	    DEFAULT_PAD_ORDER,
+	    L_DEFAULT_PAD_MODE,
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)
+
+    cmd = "python TACHY-Compiler/compiler/utils/tachy_model.py {} {} {} {} {}".format(
+	    ONNX_COMP_PATH,
+	    LAYER_COMP_PATH,
+	    TACHY_INPUT_SHAPE,
+	    DEFAULT_PAD_ORDER,
+	    L_DEFAULT_PAD_MODE,
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)
+
+    # Compile - Block
+    cmd = "python TACHY-Compiler/compiler/utils/tachy_block.py {} {} {} {} {} {} {} {}".format(
+	    LAYER_EVAL_PATH,
+	    BLOCK_EVAL_PATH,
+	    TACHY_INPUT_SHAPE,
+	    DEFAULT_PAD_ORDER,
+	    B_DEFAULT_PAD_MODE,
+            LOGIT_ORDER,
+            f"--work_dir={TEMP_DIR}",
+            f"--script_dir=TACHY-Compiler/compiler/utils",
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)
+
+    cmd = "python TACHY-Compiler/compiler/utils/tachy_block.py {} {} {} {} {} {} {} {} {}".format(
+	    LAYER_COMP_PATH,
+	    BLOCK_COMP_PATH,
+	    TACHY_INPUT_SHAPE,
+	    DEFAULT_PAD_ORDER,
+	    B_DEFAULT_PAD_MODE,
+            LOGIT_ORDER,
+            f"--work_dir={TEMP_DIR}",
+            f"--script_dir=TACHY-Compiler/compiler/utils",
+	    f"--ref_file={LAYER_EVAL_PATH}",
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)
+
+    # Compile - Runtime
+    cmd = "python TACHY-Compiler/compiler/utils/compile_runtime.py {} {}".format(
+	    BLOCK_COMP_PATH,
+	    WORK_DIR,
+    )
+    if _VERBOSE: print(f"[INFO] {cmd}")
+    os.system(cmd)

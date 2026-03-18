@@ -1,0 +1,3 @@
+python train.py --workers 16 --device 2 --batch 32 --data data/coco.yaml --img 416 --cfg models/deeper-i/bsnet-t.yaml --weights '' --name bsnet-t --hyp hyp.scratch.yaml --min-items 0 --epochs 5 --close-mosaic 3 --optimize SGD
+python train.py --workers 16 --device 2 --batch 32 --data data/coco.yaml --img 416 --cfg models/deeper-i/bsnet-t-o.yaml --weights 'runs/train/bsnet-t/weights' --name bsnet-t-o --hyp hyp.optimize.yaml --min-items 0 --epochs 5 --close-mosaic 5 --optimize SGD
+python train.py --workers 16 --device 2 --batch 32 --data data/coco.yaml --img 416 --cfg models/deeper-i/bsnet-t-op.yaml --weights 'runs/train/bsnet-t-o/weights' --name bsnet-t-op --hyp hyp.optimize.yaml --min-items 0 --epochs 5 --close-mosaic 5 --optimize SGD
