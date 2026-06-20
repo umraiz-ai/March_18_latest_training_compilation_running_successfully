@@ -4,6 +4,9 @@ Export a YOLO .pt checkpoint to ONNX compatible with val.py.
 
 This wrapper uses the project's official export pipeline (export.run),
 which configures detection heads for export and writes YOLO metadata.
+
+python export_pt2onnx_val.py --weights /full/path/to/best.pt --output /full/path/model.onnx
+
 """
 
 import argparse
